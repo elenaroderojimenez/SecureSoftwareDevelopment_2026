@@ -1,20 +1,29 @@
 from functools import wraps
+import re
 
 import bcrypt
 from flask import flash, redirect, render_template, request, session, url_for
 
 from ..config import Config
-from ..models.user_model import create_user, find_password_hash, username_exists
+from ..models.user_model import (
+    create_user,
+    email_exists,
+    find_password_hash,
+    username_exists,
+)
+
+
+def valid_email(email):
+    return re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) is not None
 
 
 def hash_password(password):
     salt = bcrypt.gensalt()
-    password_hash = bcrypt.hashpw(password.encode("utf-8"), salt)
-    return password_hash, salt
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(password, stored_hash):
-    return bcrypt.checkpw(password.encode("utf-8"), stored_hash)
+    return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
 
 
 def login_required(view):
@@ -32,15 +41,24 @@ def register_auth_routes(app):
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
-            username = request.form["username"]
-            password = request.form["password"]
+            username = request.form.get("username", "").strip()
+            email = request.form.get("email", "").strip().lower()
+            password = request.form.get("password", "")
+
+            if not valid_email(email):
+                flash("Error: Please enter a valid email address.")
+                return redirect(url_for("register"))
 
             if username_exists(Config.DATABASE, username):
                 flash("Error: Username already exists.")
                 return redirect(url_for("register"))
 
-            password_hash, salt = hash_password(password)
-            create_user(Config.DATABASE, username, password_hash, salt)
+            if email_exists(Config.DATABASE, email):
+                flash("Error: Email already exists.")
+                return redirect(url_for("register"))
+
+            password_hash = hash_password(password)
+            create_user(Config.DATABASE, username, email, password_hash)
             flash("Registration Successful! Please log in.")
             return redirect(url_for("login"))
 

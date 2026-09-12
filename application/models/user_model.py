@@ -11,15 +11,25 @@ def username_exists(database, username):
         connection.close()
 
 
-def create_user(database, username, password_hash, salt):
+def email_exists(database, email):
+    connection = get_connection(database)
+    try:
+        return connection.execute(
+            "SELECT email FROM users WHERE email = ?", (email,)
+        ).fetchone() is not None
+    finally:
+        connection.close()
+
+
+def create_user(database, username, email, password_hash):
     connection = get_connection(database)
     try:
         connection.execute(
             """
-            INSERT INTO users (username, password_hash, salt)
+            INSERT INTO users (username, email, password_hash)
             VALUES (?, ?, ?)
             """,
-            (username, password_hash, salt),
+            (username, email, password_hash),
         )
         connection.commit()
     finally:
