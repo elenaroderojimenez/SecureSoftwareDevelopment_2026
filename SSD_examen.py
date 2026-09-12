@@ -20,18 +20,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
-            password_hash BLOB,
-            salt BLOB
+            password_hash BLOB NOT NULL,
+            salt BLOB NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user'
         )
     ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT,
-            owner TEXT,
+            filename TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(owner) REFERENCES users(username)
         )
     ''')
