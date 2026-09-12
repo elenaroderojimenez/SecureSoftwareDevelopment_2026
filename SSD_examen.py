@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24) 
 
 UPLOAD_FOLDER = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024  
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 DB_NAME = "users_assig2.db"
@@ -162,6 +162,11 @@ def download_file(filename):
     else:
         flash("Unauthorized: You do not have permission to access this file.")
         return redirect(url_for('upload_file'))
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    flash('File exceeds the maximum allowed size (1 MB).')
+    return redirect(url_for('upload_file'))
 
 if __name__ == '__main__':
     app.run(debug=True)
