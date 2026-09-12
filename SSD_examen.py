@@ -1,9 +1,8 @@
-
 import os
 import sqlite3
 import bcrypt
 from functools import wraps
-from flask import Flask, request, redirect, url_for, session, render_template_string, flash, send_from_directory
+from flask import Flask, request, redirect, url_for, session, render_template, flash, send_from_directory
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -56,90 +55,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-
-HTML_LOGIN = """
-<!doctype html>
-<title>Secure Login</title>
-<h2>Login</h2>
-{% for message in get_flashed_messages() %}
-  <p style="color: red;">{{ message }}</p>
-{% endfor %}
-<form method="post">
-  Username: <input type="text" name="username" required><br><br>
-  Password: <input type="password" name="password" required><br><br>
-  <input type="submit" value="Login">
-</form>
-<p>No account? <a href="/register">Register here</a></p>
-"""
-
-HTML_REGISTER = """
-<!doctype html>
-<title>Register</title>
-<h2>Register New User</h2>
-{% for message in get_flashed_messages() %}
-  <p style="color: red;">{{ message }}</p>
-{% endfor %}
-<form method="post">
-  Username: <input type="text" name="username" required><br><br>
-  Password: <input type="password" name="password" required><br><br>
-  <input type="submit" value="Register">
-</form>
-<p><a href="/login">Back to Login</a></p>
-"""
-
-HTML_UPLOAD = """
-<!doctype html>
-<title>Secure File Upload</title>
-<style>
-  /* Ocultamos el input original del navegador */
-  input[type="file"] {
-    display: none;
-  }
-  /* Damos estilo al label para que parezca un botón */
-  .custom-file-upload {
-    border: 1px solid #777;
-    display: inline-block;
-    padding: 6px 12px;
-    cursor: pointer;
-    background-color: #e0e0e0;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    border-radius: 4px;
-  }
-  .custom-file-upload:hover {
-    background-color: #d0d0d0;
-  }
-</style>
-
-<h2>File Dashboard</h2>
-<p>User: <b>{{ session['username'] }}</b> | <a href="/logout">Logout</a></p>
-
-{% for message in get_flashed_messages() %}
-  <p style="color: blue;">{{ message }}</p>
-{% endfor %}
-
-<form method="post" enctype="multipart/form-data">
-  <!-- Botón personalizado en inglés -->
-  <label class="custom-file-upload">
-    <input type="file" name="file" required onchange="document.getElementById('file-chosen').textContent = this.files[0].name">
-    Browse File
-  </label>
-  <span id="file-chosen" style="margin-left: 10px;">No file chosen</span>
-  <br><br>
-  <input type="submit" value="Upload File">
-</form>
-
-<h3>Available Files:</h3>
-<ul>
-{% for file in files %}
-  <li><a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a></li>
-{% else %}
-  <li>No files uploaded.</li>
-{% endfor %}
-</ul>
-"""
-
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -168,7 +83,7 @@ def register():
         flash("Registration Successful! Please log in.")
         return redirect(url_for('login'))
         
-    return render_template_string(HTML_REGISTER)
+    return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -191,7 +106,7 @@ def login():
         
         flash("Invalid credentials.")
             
-    return render_template_string(HTML_LOGIN)
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
@@ -231,8 +146,7 @@ def upload_file():
     user_files = [row[0] for row in cursor.fetchall()]
     conn.close()
     
-    return render_template_string(HTML_UPLOAD, files=user_files)
-
+    return render_template('upload.html', files=user_files)
 
 @app.route('/download/<filename>')
 @login_required
@@ -248,8 +162,6 @@ def download_file(filename):
     else:
         flash("Unauthorized: You do not have permission to access this file.")
         return redirect(url_for('upload_file'))
-    
-
 
 if __name__ == '__main__':
     app.run(debug=True)

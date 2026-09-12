@@ -1,0 +1,13 @@
+<!doctype html>
+<title>Register</title>
+<h2>Register New User</h2>
+{% for message in get_flashed_messages() %}
+  <p style="color: red;">{{ message }}</p>
+{% endfor %}
+<form method="post">
+  Username: <input type="text" name="username" required><br><br>
+  Password: <input type="password" name="password" required><br><br>
+  <input type="submit" value="Register">
+</form>
+<p><a href="/login">Back to Login</a></p>
+
