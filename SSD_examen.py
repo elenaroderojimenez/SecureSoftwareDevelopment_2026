@@ -12,7 +12,7 @@ UPLOAD_FOLDER = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-DB_NAME = "users_assig2.db"
+DB_NAME = "users.db"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
