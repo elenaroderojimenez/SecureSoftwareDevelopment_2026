@@ -27,6 +27,15 @@ def init_db():
             salt BLOB
         )
     ''')
+    # NUEVA TABLA PARA LOS ARCHIVOS
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT,
+            owner TEXT,
+            FOREIGN KEY(owner) REFERENCES users(username)
+        )
+    ''')
     conn.commit()
     conn.close()
 
@@ -200,19 +209,47 @@ def upload_file():
         if allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            
+            # --- NUEVO: Guardar metadatos en la BD ---
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute('INSERT INTO files (filename, owner) VALUES (?, ?)', (filename, session['username']))
+            conn.commit()
+            conn.close()
+            # -----------------------------------------
+
             flash(f'File "{filename}" uploaded successfully.')
         else:
             flash('File type not allowed.')
             
         return redirect(request.url)
 
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
-    return render_template_string(HTML_UPLOAD, files=files)
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT filename FROM files WHERE owner = ?', (session['username'],))
+    user_files = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    return render_template_string(HTML_UPLOAD, files=user_files)
+
 
 @app.route('/download/<filename>')
 @login_required
 def download_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+    # Comprobar si el usuario logueado es el dueño de este archivo
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM files WHERE filename = ? AND owner = ?', (filename, session['username']))
+    record = cursor.fetchone()
+    conn.close()
+    
+    if record:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], secure_filename(filename))
+    else:
+        flash("Unauthorized: You do not have permission to access this file.")
+        return redirect(url_for('upload_file'))
+    
 
+    
 if __name__ == '__main__':
     app.run(debug=True)
