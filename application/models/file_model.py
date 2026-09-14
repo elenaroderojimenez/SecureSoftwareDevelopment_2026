@@ -4,7 +4,7 @@ from ..database import get_connection
 def create_file(database, original_name, stored_name, owner):
     connection = get_connection(database)
     try:
-        connection.execute(
+        cursor = connection.execute(
             """
             INSERT INTO files (filename, original_name, stored_name, owner)
             VALUES (?, ?, ?, ?)
@@ -12,6 +12,7 @@ def create_file(database, original_name, stored_name, owner):
             (stored_name, original_name, stored_name, owner),
         )
         connection.commit()
+        return cursor.lastrowid
     finally:
         connection.close()
 

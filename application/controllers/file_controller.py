@@ -2,7 +2,7 @@ import os
 import uuid
 
 from werkzeug.utils import secure_filename
-from flask import current_app, flash, redirect, render_template, request, send_from_directory, session, url_for
+from flask import current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from ..models.file_model import create_file, find_owned_file, list_user_files
 from .auth_controller import login_required
@@ -40,12 +40,14 @@ def register_file_routes(app):
                 flash("No file selected.")
                 return redirect(request.url)
 
-            if allowed_file(file.filename, current_app.config["ALLOWED_EXTENSIONS"]):
-                original_name = sanitise_filename(file.filename)
-                if not original_name:
-                    flash("Invalid file name.")
-                    return redirect(request.url)
-
+            original_name = sanitise_filename(file.filename)
+            if not original_name:
+                flash("Invalid file name.")
+            elif not allowed_file(
+                original_name, current_app.config["ALLOWED_EXTENSIONS"]
+            ):
+                flash("File type not allowed.")
+            else:
                 stored_name = generate_stored_filename(original_name)
                 save_file(file, current_app.config["UPLOAD_FOLDER"], stored_name)
                 create_file(
@@ -55,8 +57,6 @@ def register_file_routes(app):
                     session["username"],
                 )
                 flash(f'File "{original_name}" uploaded successfully.')
-            else:
-                flash("File type not allowed.")
 
             return redirect(request.url)
 
@@ -86,5 +86,12 @@ def register_file_routes(app):
 
     @app.errorhandler(413)
     def request_entity_too_large(error):
+        if request.path.startswith("/api/"):
+            return jsonify(
+                {
+                    "error": "file_too_large",
+                    "message": "File exceeds the maximum allowed size (1 MB).",
+                }
+            ), 413
         flash("File exceeds the maximum allowed size (1 MB).")
         return redirect(url_for("upload_file"))

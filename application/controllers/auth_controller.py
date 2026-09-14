@@ -34,6 +34,7 @@ MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300
 MAX_RESET_REQUESTS = 2
 RESET_REQUEST_WINDOW_SECONDS = 3600
+BCRYPT_ROUNDS = 12
 reset_request_attempts = {}
 
 
@@ -57,7 +58,7 @@ def valid_password(password):
 
 
 def hash_password(password):
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 

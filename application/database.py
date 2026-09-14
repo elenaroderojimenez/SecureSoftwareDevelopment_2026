@@ -56,6 +56,20 @@ def _create_tables(connection):
         )
         """
     )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS api_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            session_version INTEGER NOT NULL,
+            expires_at TEXT NOT NULL,
+            revoked_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE
+        )
+        """
+    )
 
 
 def initialise_database(database):

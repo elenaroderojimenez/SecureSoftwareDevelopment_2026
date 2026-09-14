@@ -266,3 +266,4 @@ def test_uploads_with_the_same_name_are_stored_separately(client, app):
     upload_folder = Path(app.config["UPLOAD_FOLDER"])
     assert (upload_folder / files[0][2]).read_bytes() == b"alice's document"
     assert (upload_folder / files[1][2]).read_bytes() == b"bob's document"
+
