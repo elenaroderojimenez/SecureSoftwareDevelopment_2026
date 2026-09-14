@@ -1,0 +1,339 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black,
+    pdftitle={Test-Driven Development Documentation},
+    pdfauthor={Candidate ID: INSERT-ID}
+}
+
+\definecolor{codebackground}{RGB}{245,245,245}
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{codebackground},
+    frame=single,
+    breaklines=true,
+    columns=fullflexible
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\title{Test-Driven Development Documentation\\
+\large Secure Software Development Authentication Controls}
+\author{Candidate ID: \texttt{INSERT-CANDIDATE-ID}}
+\date{Spring 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document records the test-driven development (TDD) approach used to verify
+and strengthen registration, login, session protection and basic login-attempt
+protection in the Secure Software Development Flask application. The document
+maps the tests to the authentication and TDD expectations in the MC100 exam,
+describes the test environment, and explains the relationship between each
+security requirement, test and implementation decision. The focus is deliberately
+limited to the local academic application and does not claim production readiness.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Purpose and Exam Alignment}
+
+The MC100 exam requires secure account creation and authentication with modern
+password hashing, secure credential verification, and TDD for selected
+security-related functionality \cite{mc100exam,mc100guidelines}. In particular,
+the work documented here supports:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Task A.3.1}: user registration and login with secure password
+    hashing.
+    \item \textbf{Task A.4.3}: TDD applied to authentication and an additional
+    relevant application security scenario.
+    \item \textbf{Task A.4.1}: parameterised database access is retained by the
+    application models and is covered separately in the penetration-testing work.
+\end{itemize}
+
+The tests focus on observable security behaviour rather than implementation
+details alone. This makes the evidence useful both for development and for the
+exam report.
+
+\section{Scope}
+
+The documented scope is restricted to the following local Flask application
+controls:
+
+\begin{itemize}[leftmargin=*]
+    \item server-side validation of usernames, email addresses and passwords;
+    \item bcrypt password hashing and password verification;
+    \item duplicate username and email prevention;
+    \item successful and unsuccessful login behaviour;
+    \item session-based access control for protected routes;
+    \item basic protection against repeated failed login attempts; and
+    \item session-cookie settings appropriate for local development.
+\end{itemize}
+
+The project remains a local academic system. It does not add JWT, OAuth, MFA,
+external identity providers or production deployment infrastructure, because
+those are outside the required scope at this stage.
+
+\section{TDD Method and Traceability}
+
+TDD follows the Red-Green-Refactor cycle \cite{beck}:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Red}: write a test that expresses one security requirement and
+    observe that the requirement is not yet met.
+    \item \textbf{Green}: add the smallest implementation change needed for the
+    test to pass.
+    \item \textbf{Refactor}: improve clarity while keeping the full test suite
+    passing.
+\end{enumerate}
+
+The original project already contained baseline registration and login code.
+Therefore, this documentation does not claim that all earlier code was
+historically written with TDD. Existing behaviour was first protected by
+characterisation tests. The new validation and login-attempt controls were then
+defined by tests before their implementation was completed. This distinction
+keeps the report accurate while demonstrating a real test-first security
+workflow for the current iteration.
+
+\section{Test Environment}
+
+The test suite is stored in \texttt{tests/test\_auth.py} and uses \texttt{pytest},
+Flask's built-in test client, bcrypt and a temporary SQLite database.
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{@{}lY@{}}
+\toprule
+\textbf{Component} & \textbf{Purpose} \\
+\midrule
+pytest & Collects and executes the authentication tests. \\
+Flask test client & Sends requests without starting a public web server. \\
+Temporary SQLite database & Isolates each test from \texttt{users.db} and prevents
+test data from affecting the local application database. \\
+\texttt{monkeypatch} fixture & Replaces the configured database path with the
+temporary database path for each test. \\
+\texttt{failed\_login\_attempts.clear()} & Resets the in-memory lockout state so
+tests do not influence each other. \\
+\bottomrule
+\end{tabularx}
+\caption{Authentication test environment.}
+\end{table}
+
+The isolated database is an important part of repeatable TDD: a failed or
+successful test must not depend on a manually created account or on the order in
+which a developer previously used the application.
+
+\section{Security Policy Under Test}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{@{}lY@{}}
+\toprule
+\textbf{Area} & \textbf{Policy} \\
+\midrule
+Username & 3--30 characters; letters, digits and underscore only. \\
+Email & Checked server-side before database access. \\
+Password length & Minimum 8 and maximum 16 characters. \\
+Password composition & At least one lowercase letter, uppercase letter and digit. \\
+Password storage & bcrypt hash using cost factor 12; no plaintext password is stored. \\
+Duplicate accounts & Username and email are checked before insertion; the database
+also enforces unique email values. \\
+Login lockout & Five failed attempts lock the submitted username for 300 seconds. \\
+Session cookie & \texttt{HttpOnly=True} and \texttt{SameSite=Lax}. The \texttt{Secure}
+flag is false because the assessed system is local and uses HTTP. \\
+\bottomrule
+\end{tabularx}
+\caption{Security policy applied to the local academic application.}
+\end{table}
+
+\section{Authentication Test Matrix}
+
+Table \ref{tab:tests} maps each test to its security purpose. The comments inside
+the test file state the security requirement, the action under test and the
+expected result.
+
+\small
+\begin{longtable}{@{}p{0.38\textwidth}p{0.27\textwidth}p{0.27\textwidth}@{}}
+\caption{TDD authentication test matrix.}\label{tab:tests}\\
+\toprule
+\textbf{Test} & \textbf{Security requirement} & \textbf{Expected result} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Test} & \textbf{Security requirement} & \textbf{Expected result} \\
+\midrule
+\endhead
+\texttt{test\_register\_stores\_bcrypt\_hash\_as\_text} & Passwords are never
+stored in plaintext. & A bcrypt text hash is stored and verifies the submitted
+password. \\
+\texttt{test\_register\_rejects\_invalid\_email} & Email validation is performed
+on the server. & No account is created for malformed email input. \\
+\texttt{test\_register\_rejects\_invalid\_username} & Usernames have a predictable
+safe format. & Whitespace and unsupported characters are rejected. \\
+\texttt{test\_register\_rejects\_short\_password} & Passwords meet the minimum
+length. & Passwords shorter than 8 characters are rejected. \\
+\texttt{test\_register\_rejects\_password\_without\_uppercase\_letter} & Password
+composition includes an uppercase character. & Account creation is refused. \\
+\texttt{test\_register\_rejects\_password\_without\_lowercase\_letter} & Password
+composition includes a lowercase character. & Account creation is refused. \\
+\texttt{test\_register\_rejects\_password\_without\_number} & Password composition
+includes a digit. & Account creation is refused. \\
+\texttt{test\_register\_rejects\_password\_longer\_than\_16\_characters} & Password
+length has an upper bound. & Passwords longer than 16 characters are rejected. \\
+\texttt{test\_register\_rejects\_duplicate\_username} & Each username identifies
+one account. & The duplicate account is not created. \\
+\texttt{test\_register\_rejects\_duplicate\_email} & One email cannot be linked
+to multiple accounts. & The duplicate account is not created. \\
+\texttt{test\_login\_accepts\_valid\_credentials} & Valid credentials authenticate
+the user. & The authenticated dashboard is returned. \\
+\texttt{test\_login\_rejects\_wrong\_password\_without\_session} & Invalid
+passwords do not create sessions. & A generic error is shown and no login session
+exists. \\
+\texttt{test\_login\_rejects\_unknown\_user\_without\_session} & Unknown users
+follow the safe failure path. & A generic error is shown and no login session
+exists. \\
+\texttt{test\_login\_blocks\_repeated\_failed\_attempts} & Repeated failures are
+temporarily rate-limited. & The sixth request is blocked, even with valid
+credentials. \\
+\texttt{test\_protected\_route\_rejects\_anonymous\_user} & Protected resources
+require authentication. & The anonymous client is redirected to login. \\
+\texttt{test\_session\_cookie\_configuration} & Session cookies reduce
+client-side exposure. & \texttt{HttpOnly} and \texttt{SameSite=Lax} are enabled. \\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\section{Implementation Linked to the Tests}
+
+The following implementation changes were made after the relevant test cases had
+been defined:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{valid\_username()} uses a regular expression to accept only the
+    selected 3--30 character username format.
+    \item \texttt{valid\_email()} checks that email input has a basic address
+    structure before it reaches the database.
+    \item \texttt{valid\_password()} enforces the selected length and composition
+    policy.
+    \item \texttt{hash\_password()} uses \texttt{bcrypt.gensalt(rounds=12)} and
+    stores the resulting hash as UTF-8 text.
+    \item \texttt{verify\_password()} verifies the submitted password against the
+    stored bcrypt hash.
+    \item \texttt{login\_is\_locked()}, \texttt{record\_failed\_login()} and
+    \texttt{clear\_failed\_login\_attempts()} implement the basic lockout rule.
+    \item \texttt{login\_required} continues to protect routes through a Flask
+    decorator and redirects anonymous users to the login page.
+\end{itemize}
+
+The following excerpt illustrates the password validation rule:
+
+\begin{lstlisting}[language=Python, caption={Password validation rule.}]
+def valid_password(password):
+    return (
+        8 <= len(password) <= 16
+        and any(character.islower() for character in password)
+        and any(character.isupper() for character in password)
+        and any(character.isdigit() for character in password)
+    )
+\end{lstlisting}
+
+\section{Execution Procedure and Evidence}
+
+From the project root, run the following commands in PowerShell:
+
+\begin{lstlisting}[caption={Test execution commands.}]
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pytest -q tests/test_auth.py
+\end{lstlisting}
+
+The latest observed test execution produced pass markers for all 16 tests. Before
+submission, execute the final command locally again and retain a small screenshot
+showing the command and final pytest summary. The exam guidance asks for concise
+evidence rather than complete screenshots, so one cropped terminal image is
+sufficient.
+
+Recommended evidence for the report:
+
+\begin{enumerate}[leftmargin=*]
+    \item A small screenshot of the pytest result.
+    \item A short code excerpt of one representative test, such as the bcrypt
+    storage test or lockout test.
+    \item A short code excerpt of \texttt{valid\_password()}.
+    \item One or two sentences explaining the Red-Green-Refactor cycle and why
+    the selected login lockout scenario matters.
+\end{enumerate}
+
+\section{Limitations and Future Work}
+
+The login-attempt protection is intentionally basic. It uses an in-memory Python
+dictionary, which is suitable for the local single-process coursework
+application. It resets when the application restarts and is not shared across
+multiple server instances. A production system would use a persistent or shared
+rate-limiting store and would be deployed over HTTPS with a non-hardcoded secret
+key and a secure cookie flag.
+
+These production controls are not claimed as part of the current local exam
+implementation. Future roadmap stages will add password reset functionality,
+secure file handling, further penetration testing and Cerebras API protection.
+
+\section{Conclusion}
+
+The authentication component is covered by a focused suite of 16 repeatable
+tests. The suite verifies the most relevant local security properties: validation,
+bcrypt hashing, safe login failure behaviour, session protection and a basic
+defence against repeated login attempts. The TDD workflow provides traceable
+evidence that the current authentication security requirements were specified as
+tests and verified after implementation.
+
+\begin{thebibliography}{9}
+
+\bibitem{mc100exam}
+Kristiania University College.
+\textit{MC100 Secure Software Development Exam Task 2026}.
+Course examination paper, Spring 2026.
+
+\bibitem{mc100guidelines}
+Kristiania University College.
+\textit{MC100 Secure Software Development Grading Guidelines (A--F Scale)}.
+Spring 2026.
+
+\bibitem{beck}
+Kent Beck.
+\textit{Test-Driven Development: By Example}.
+Addison-Wesley, 2002.
+
+\bibitem{owasp-authentication}
+OWASP Foundation.
+\textit{Authentication Cheat Sheet}.
+\url{https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html}
+
+\bibitem{owasp-password-storage}
+OWASP Foundation.
+\textit{Password Storage Cheat Sheet}.
+\url{https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html}
+
+\end{thebibliography}
+
+\end{document}

@@ -24,6 +24,10 @@ Run the application with:
 python SSD_examen.py
 ```
 
+The application requires passwords between 8 and 16 characters, including an
+uppercase letter, a lowercase letter and a number. Five failed login attempts
+temporarily lock the username for five minutes.
+
 The application is available at `http://127.0.0.1:5000/`.
 
 ## Current structure
