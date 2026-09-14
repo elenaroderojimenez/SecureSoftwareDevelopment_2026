@@ -1,4 +1,6 @@
 import sqlite3
+from io import BytesIO
+from pathlib import Path
 
 import bcrypt
 import pytest
@@ -11,6 +13,7 @@ from application.config import Config
 def app(tmp_path, monkeypatch):
     database = tmp_path / "test_users.db"
     monkeypatch.setattr(Config, "DATABASE", str(database))
+    monkeypatch.setattr(Config, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
 
     application = create_app()
     application.config.update(TESTING=True)
@@ -217,3 +220,49 @@ def test_session_cookie_configuration(app):
     # Assert: JavaScript cannot read the cookie and same-site protection is enabled.
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+
+
+def test_uploads_with_the_same_name_are_stored_separately(client, app):
+    """A server-generated identifier must prevent one user's upload replacing another's."""
+    register_user(client)
+    client.post("/login", data={"username": "alice", "password": "Password123"})
+    first_upload = client.post(
+        "/",
+        data={"file": (BytesIO(b"alice's document"), "assignment.txt")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    with app.test_client() as second_client:
+        register_user(
+            second_client,
+            username="bob",
+            email="bob@example.com",
+        )
+        second_client.post(
+            "/login", data={"username": "bob", "password": "Password123"}
+        )
+        second_upload = second_client.post(
+            "/",
+            data={"file": (BytesIO(b"bob's document"), "assignment.txt")},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+    assert b"uploaded successfully." in first_upload.data
+    assert b"uploaded successfully." in second_upload.data
+
+    connection = sqlite3.connect(app.config["DATABASE"])
+    try:
+        files = connection.execute(
+            "SELECT owner, original_name, stored_name FROM files ORDER BY owner"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert [file[0] for file in files] == ["alice", "bob"]
+    assert [file[1] for file in files] == ["assignment.txt", "assignment.txt"]
+    assert files[0][2] != files[1][2]
+    upload_folder = Path(app.config["UPLOAD_FOLDER"])
+    assert (upload_folder / files[0][2]).read_bytes() == b"alice's document"
+    assert (upload_folder / files[1][2]).read_bytes() == b"bob's document"

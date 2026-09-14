@@ -28,6 +28,14 @@ The application requires passwords between 8 and 16 characters, including an
 uppercase letter, a lowercase letter and a number. Five failed login attempts
 temporarily lock the username for five minutes.
 
+## File storage
+
+Each accepted upload is assigned a server-generated UUID for its on-disk name.
+The database stores that internal name together with the original filename and
+the owning user. This means users can upload files with identical names without
+overwriting one another, while the dashboard and downloaded attachment retain
+the original filename.
+
 ## Password reset in local development
 
 Select **Forgot password?** on the login page and submit the account email.
