@@ -147,7 +147,7 @@ def register_auth_routes(app):
             password = request.form.get("password", "")
 
             if login_is_locked(Config.DATABASE, username):
-                flash("Too many login attempts. Please try again later.")
+                flash("Too many login attempts. Please wait 5 minutes and try again.")
                 return render_template("login.html")
 
             record = find_password_hash(Config.DATABASE, username)
@@ -199,7 +199,10 @@ def register_auth_routes(app):
                     reset_link = f"{Config.RESET_LINK_BASE_URL}{reset_path}"
                     print(f"Development password reset link: {reset_link}")
 
-            flash("If the email exists, a password reset link has been created.")
+            flash(
+                "If the email exists, a password reset link has been created. "
+                "It expires in 15 minutes."
+            )
             return redirect(url_for("login"))
 
         return render_template("forgot_password.html")
