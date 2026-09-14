@@ -44,3 +44,25 @@ def find_password_hash(database, username):
         ).fetchone()
     finally:
         connection.close()
+
+
+def find_session_version(database, username):
+    connection = get_connection(database)
+    try:
+        record = connection.execute(
+            "SELECT session_version FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return record[0] if record else None
+    finally:
+        connection.close()
+
+
+def find_username_by_email(database, email):
+    connection = get_connection(database)
+    try:
+        record = connection.execute(
+            "SELECT username FROM users WHERE email = ?", (email,)
+        ).fetchone()
+        return record[0] if record else None
+    finally:
+        connection.close()

@@ -5,14 +5,12 @@ import pytest
 
 from application import create_app
 from application.config import Config
-from application.controllers.auth_controller import failed_login_attempts
 
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     database = tmp_path / "test_users.db"
     monkeypatch.setattr(Config, "DATABASE", str(database))
-    failed_login_attempts.clear()
 
     application = create_app()
     application.config.update(TESTING=True)

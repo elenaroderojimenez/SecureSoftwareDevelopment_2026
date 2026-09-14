@@ -10,7 +10,19 @@ from ..models.user_model import (
     create_user,
     email_exists,
     find_password_hash,
+    find_session_version,
+    find_username_by_email,
     username_exists,
+)
+from ..models.login_attempt_model import (
+    clear_failed_login_attempts,
+    login_is_locked,
+    record_failed_login,
+)
+from ..models.password_reset_model import (
+    create_reset_token,
+    find_valid_reset_token_username,
+    reset_password_with_token,
 )
 
 
@@ -20,7 +32,9 @@ MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 16
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300
-failed_login_attempts = {}
+MAX_RESET_REQUESTS = 2
+RESET_REQUEST_WINDOW_SECONDS = 3600
+reset_request_attempts = {}
 
 
 def valid_username(username):
@@ -43,7 +57,7 @@ def valid_password(password):
 
 
 def hash_password(password):
-    salt = bcrypt.gensalt(rounds=12)
+    salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
@@ -51,40 +65,38 @@ def verify_password(password, stored_hash):
     return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("utf-8"))
 
 
-def login_is_locked(username):
-    attempt = failed_login_attempts.get(username)
-    if not attempt:
+def reset_request_is_allowed(email):
+    now = time.time()
+    recent_requests = [
+        timestamp
+        for timestamp in reset_request_attempts.get(email, [])
+        if now - timestamp < RESET_REQUEST_WINDOW_SECONDS
+    ]
+
+    if len(recent_requests) >= MAX_RESET_REQUESTS:
+        reset_request_attempts[email] = recent_requests
         return False
 
-    if attempt["locked_until"] > time.time():
-        return True
-
-    if attempt["locked_until"]:
-        failed_login_attempts.pop(username)
-    return False
-
-
-def record_failed_login(username):
-    attempt = failed_login_attempts.setdefault(
-        username, {"count": 0, "locked_until": 0}
-    )
-    attempt["count"] += 1
-
-    if attempt["count"] >= MAX_LOGIN_ATTEMPTS:
-        attempt["locked_until"] = time.time() + LOCKOUT_SECONDS
-
-
-def clear_failed_login_attempts(username):
-    failed_login_attempts.pop(username, None)
+    recent_requests.append(now)
+    reset_request_attempts[email] = recent_requests
+    return True
 
 
 def login_required(view):
     @wraps(view)
     def decorated_function(*args, **kwargs):
-        if "logged_in" not in session:
-            flash("Access denied. Please log in.")
-            return redirect(url_for("login"))
-        return view(*args, **kwargs)
+        username = session.get("username")
+        session_version = session.get("session_version")
+        if (
+            session.get("logged_in") is True
+            and username
+            and session_version == find_session_version(Config.DATABASE, username)
+        ):
+            return view(*args, **kwargs)
+
+        session.clear()
+        flash("Access denied. Please log in.")
+        return redirect(url_for("login"))
 
     return decorated_function
 
@@ -134,20 +146,29 @@ def register_auth_routes(app):
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
 
-            if login_is_locked(username):
+            if login_is_locked(Config.DATABASE, username):
                 flash("Too many login attempts. Please try again later.")
                 return render_template("login.html")
 
             record = find_password_hash(Config.DATABASE, username)
 
             if record and verify_password(password, record[0]):
-                clear_failed_login_attempts(username)
+                clear_failed_login_attempts(Config.DATABASE, username)
                 session.clear()
                 session["logged_in"] = True
                 session["username"] = username
+                session["session_version"] = find_session_version(
+                    Config.DATABASE, username
+                )
                 return redirect(url_for("upload_file"))
 
-            record_failed_login(username)
+            if record:
+                record_failed_login(
+                    Config.DATABASE,
+                    username,
+                    MAX_LOGIN_ATTEMPTS,
+                    LOCKOUT_SECONDS,
+                )
             flash("Invalid credentials.")
 
         return render_template("login.html")
@@ -157,3 +178,62 @@ def register_auth_routes(app):
         session.clear()
         flash("Successfully logged out.")
         return redirect(url_for("login"))
+
+    @app.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password():
+        if request.method == "POST":
+            email = request.form.get("email", "").strip().lower()
+
+            # Use the same response for every request to avoid revealing emails.
+            if valid_email(email):
+                username = find_username_by_email(Config.DATABASE, email)
+                if username and reset_request_is_allowed(email):
+                    token = create_reset_token(
+                        Config.DATABASE,
+                        username,
+                        Config.RESET_TOKEN_LIFETIME_MINUTES,
+                    )
+                    reset_path = url_for(
+                        "reset_password", token=token
+                    )
+                    reset_link = f"{Config.RESET_LINK_BASE_URL}{reset_path}"
+                    print(f"Development password reset link: {reset_link}")
+
+            flash("If the email exists, a password reset link has been created.")
+            return redirect(url_for("login"))
+
+        return render_template("forgot_password.html")
+
+    @app.route("/reset-password/<token>", methods=["GET", "POST"])
+    def reset_password(token):
+        username = find_valid_reset_token_username(Config.DATABASE, token)
+        if not username:
+            flash("Invalid or expired password reset link.")
+            return redirect(url_for("forgot_password"))
+
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            confirm_password = request.form.get("confirm_password", "")
+
+            if not valid_password(password):
+                flash(
+                    "Error: Password must be 8-16 characters with uppercase, lowercase, and a number."
+                )
+                return render_template("reset_password.html", token=token)
+
+            if password != confirm_password:
+                flash("Error: Passwords do not match.")
+                return render_template("reset_password.html", token=token)
+
+            password_hash = hash_password(password)
+            if not reset_password_with_token(Config.DATABASE, token, password_hash):
+                flash("Invalid or expired password reset link.")
+                return redirect(url_for("forgot_password"))
+
+            # End the current session after changing account credentials.
+            session.clear()
+            clear_failed_login_attempts(Config.DATABASE, username)
+            flash("Password reset successfully. Please log in.")
+            return redirect(url_for("login"))
+
+        return render_template("reset_password.html", token=token)

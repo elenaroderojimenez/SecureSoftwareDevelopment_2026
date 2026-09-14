@@ -1,42 +1,30 @@
 <!doctype html>
 <title>Secure File Upload</title>
-<style>
-  input[type="file"] {
-    display: none;
-  }
-  .custom-file-upload {
-    border: 1px solid #777;
-    display: inline-block;
-    padding: 6px 12px;
-    cursor: pointer;
-    background-color: #e0e0e0;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    border-radius: 4px;
-  }
-  .custom-file-upload:hover {
-    background-color: #d0d0d0;
-  }
-</style>
-
+<main>
 <h2>File Dashboard</h2>
 <p>User: <b>{{ session['username'] }}</b> | <a href="/logout">Logout</a></p>
+<hr>
 
 {% for message in get_flashed_messages() %}
-  <p style="color: blue;">{{ message }}</p>
+  <p>{{ message }}</p>
 {% endfor %}
 
+<section>
+<h3>Upload File</h3>
+<p>Allowed types: TXT, PDF and PNG. Maximum size: 1 MB.</p>
 <form method="post" enctype="multipart/form-data">
-  <label class="custom-file-upload">
-    <input type="file" name="file" required onchange="document.getElementById('file-chosen').textContent = this.files[0].name">
-    Browse File
-  </label>
-  <span id="file-chosen" style="margin-left: 10px;">No file chosen</span>
-  <br><br>
-  <input type="submit" value="Upload File">
+  <p>
+    <input id="file" type="file" name="file" required style="display: none;" onchange="document.getElementById('file-name').textContent = this.files[0].name">
+    <input type="button" value="Choose File" onclick="document.getElementById('file').click()">
+    <span id="file-name">No file selected</span>
+  </p>
+  <p><input type="submit" value="Upload File"></p>
 </form>
+</section>
 
-<h3>Available Files:</h3>
+<hr>
+<section>
+<h3>Your Files</h3>
 <ul>
 {% for file in files %}
   <li><a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a></li>
@@ -44,5 +32,7 @@
   <li>No files uploaded.</li>
 {% endfor %}
 </ul>
+</section>
+</main>
 
 

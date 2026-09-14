@@ -15,6 +15,7 @@ def _create_tables(connection):
             username TEXT PRIMARY KEY,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            session_version INTEGER NOT NULL DEFAULT 0,
             role TEXT NOT NULL DEFAULT 'user'
         )
         """
@@ -38,6 +39,17 @@ def _create_tables(connection):
             token_hash TEXT NOT NULL UNIQUE,
             expires_at TEXT NOT NULL,
             used_at TEXT,
+            FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            username TEXT PRIMARY KEY,
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            locked_until TEXT,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(username) REFERENCES users(username) ON DELETE CASCADE
         )
         """
