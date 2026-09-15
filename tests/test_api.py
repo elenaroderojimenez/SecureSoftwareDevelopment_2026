@@ -32,14 +32,14 @@ def register_and_login(client, username="alice", email="alice@example.com"):
         json={
             "username": username,
             "email": email,
-            "password": "Password123",
+            "password": "Password123!",
         },
     )
     assert register_response.status_code == 201
 
     login_response = client.post(
         "/api/auth/login",
-        json={"username": username, "password": "Password123"},
+        json={"username": username, "password": "Password123!"},
     )
     assert login_response.status_code == 200
     return login_response.get_json()["access_token"]
@@ -102,7 +102,7 @@ def test_password_reset_invalidates_existing_api_token(client, app):
     reset_token = create_reset_token(app.config["DATABASE"], "alice")
 
     assert reset_password_with_token(
-        app.config["DATABASE"], reset_token, hash_password("NewPassword123")
+        app.config["DATABASE"], reset_token, hash_password("NewPassword123!")
     ) is True
 
     response = client.get("/api/files", headers=auth_header(token))
@@ -140,4 +140,3 @@ def test_api_file_access_is_limited_to_owner(app, client):
     assert listing.get_json()["files"] == [
         {"id": file_id, "original_name": "document.txt"}
     ]
-

@@ -29,7 +29,7 @@ def register_user(
     client,
     username="alice",
     email="alice@example.com",
-    password="Password123",
+    password="Password123!",
 ):
     return client.post(
         "/register",
@@ -64,9 +64,9 @@ def test_register_stores_bcrypt_hash_as_text(client, app):
     assert username == "alice"
     assert email == "alice@example.com"
     assert isinstance(password_hash, str)
-    assert password_hash != "Password123"
+    assert password_hash != "Password123!"
     assert bcrypt.checkpw(
-        b"Password123", password_hash.encode("utf-8")
+        b"Password123!", password_hash.encode("utf-8")
     )
 
 
@@ -118,6 +118,14 @@ def test_register_rejects_password_without_number(client, app):
     assert get_users(app) == []
 
 
+def test_register_rejects_password_without_symbol(client, app):
+    # Security requirement: passwords must include a symbol.
+    register_user(client, password="Password123")
+
+    # Assert: the account is not created when a symbol is missing.
+    assert get_users(app) == []
+
+
 def test_register_rejects_password_longer_than_16_characters(client, app):
     # Security requirement: password length must stay within the defined limit.
     register_user(client, password="Password1" + "a" * 8)
@@ -150,7 +158,7 @@ def test_login_accepts_valid_credentials(client):
 
     response = client.post(
         "/login",
-        data={"username": "alice", "password": "Password123"},
+        data={"username": "alice", "password": "Password123!"},
         follow_redirects=True,
     )
 
@@ -177,7 +185,7 @@ def test_login_rejects_unknown_user_without_session(client):
     # Security requirement: unknown accounts must receive the same safe failure path.
     response = client.post(
         "/login",
-        data={"username": "unknown", "password": "Password123"},
+        data={"username": "unknown", "password": "Password123!"},
         follow_redirects=True,
     )
 
@@ -199,7 +207,7 @@ def test_login_blocks_repeated_failed_attempts(client):
     # Assert: even correct credentials are refused while the lock is active.
     response = client.post(
         "/login",
-        data={"username": "alice", "password": "Password123"},
+        data={"username": "alice", "password": "Password123!"},
         follow_redirects=True,
     )
     assert b"Too many login attempts." in response.data
@@ -225,7 +233,7 @@ def test_session_cookie_configuration(app):
 def test_uploads_with_the_same_name_are_stored_separately(client, app):
     """A server-generated identifier must prevent one user's upload replacing another's."""
     register_user(client)
-    client.post("/login", data={"username": "alice", "password": "Password123"})
+    client.post("/login", data={"username": "alice", "password": "Password123!"})
     first_upload = client.post(
         "/",
         data={"file": (BytesIO(b"alice's document"), "assignment.txt")},
@@ -240,7 +248,7 @@ def test_uploads_with_the_same_name_are_stored_separately(client, app):
             email="bob@example.com",
         )
         second_client.post(
-            "/login", data={"username": "bob", "password": "Password123"}
+            "/login", data={"username": "bob", "password": "Password123!"}
         )
         second_upload = second_client.post(
             "/",
@@ -266,4 +274,3 @@ def test_uploads_with_the_same_name_are_stored_separately(client, app):
     upload_folder = Path(app.config["UPLOAD_FOLDER"])
     assert (upload_folder / files[0][2]).read_bytes() == b"alice's document"
     assert (upload_folder / files[1][2]).read_bytes() == b"bob's document"
-

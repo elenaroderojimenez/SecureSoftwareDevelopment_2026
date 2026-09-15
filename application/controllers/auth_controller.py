@@ -54,6 +54,7 @@ def valid_password(password):
         and any(character.islower() for character in password)
         and any(character.isupper() for character in password)
         and any(character.isdigit() for character in password)
+        and any(not character.isalnum() for character in password)
     )
 
 
@@ -122,7 +123,7 @@ def register_auth_routes(app):
 
             if not valid_password(password):
                 flash(
-                    "Error: Password must be 8-16 characters with uppercase, lowercase, and a number."
+                    "Error: Password must be 8-16 characters with uppercase, lowercase, a number, and a symbol."
                 )
                 return redirect(url_for("register"))
 
@@ -221,7 +222,7 @@ def register_auth_routes(app):
 
             if not valid_password(password):
                 flash(
-                    "Error: Password must be 8-16 characters with uppercase, lowercase, and a number."
+                    "Error: Password must be 8-16 characters with uppercase, lowercase, a number, and a symbol."
                 )
                 return render_template("reset_password.html", token=token)
 
