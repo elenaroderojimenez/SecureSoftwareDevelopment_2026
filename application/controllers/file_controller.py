@@ -7,6 +7,8 @@ from flask import current_app, flash, jsonify, redirect, render_template, reques
 from ..models.file_model import create_file, find_owned_file, list_user_files
 from .auth_controller import login_required
 
+from markupsafe import escape
+
 
 def allowed_file(filename, allowed_extensions):
     return (
@@ -60,7 +62,7 @@ def register_file_routes(app):
 
             return redirect(request.url)
 
-        query = request.args.get("q", "").strip()
+        query = escape(request.args.get("q", "").strip())
         user_files = list_user_files(
             current_app.config["DATABASE"], session["username"], query
         )
