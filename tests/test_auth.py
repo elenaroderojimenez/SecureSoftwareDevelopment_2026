@@ -274,3 +274,30 @@ def test_uploads_with_the_same_name_are_stored_separately(client, app):
     upload_folder = Path(app.config["UPLOAD_FOLDER"])
     assert (upload_folder / files[0][2]).read_bytes() == b"alice's document"
     assert (upload_folder / files[1][2]).read_bytes() == b"bob's document"
+
+
+def test_file_search_filters_files_and_escapes_the_query(client):
+    """Search must be scoped to the signed-in user and never render HTML input."""
+    register_user(client)
+    client.post("/login", data={"username": "alice", "password": "Password123!"})
+    client.post(
+        "/",
+        data={"file": (BytesIO(b"notes"), "security-notes.txt")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    client.post(
+        "/",
+        data={"file": (BytesIO(b"report"), "report.pdf")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    filtered = client.get("/?q=notes")
+    assert b"security-notes.txt" in filtered.data
+    assert b"report.pdf" not in filtered.data
+    assert b"Showing 1 result(s) for:" in filtered.data
+
+    xss_probe = client.get("/?q=%3Cscript%3Ealert(1)%3C%2Fscript%3E")
+    assert b"<script>alert(1)</script>" not in xss_probe.data
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in xss_probe.data

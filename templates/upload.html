@@ -24,6 +24,22 @@
 
 <hr>
 <section>
+<h3>Search Your Files</h3>
+<form method="get" action="{{ url_for('upload_file') }}">
+  <label for="q">File name:</label>
+  <input id="q" type="search" name="q" value="{{ query }}" placeholder="e.g. assignment">
+  <button type="submit">Search</button>
+  {% if query %}
+    <a href="{{ url_for('upload_file') }}">Clear search</a>
+  {% endif %}
+</form>
+{% if query %}
+  <p>Showing {{ files|length }} result(s) for: <b>{{ query }}</b></p>
+{% endif %}
+</section>
+
+<hr>
+<section>
 <h3>Your Files</h3>
 <ul>
 {% for file in files %}

@@ -60,10 +60,11 @@ def register_file_routes(app):
 
             return redirect(request.url)
 
+        query = request.args.get("q", "").strip()
         user_files = list_user_files(
-            current_app.config["DATABASE"], session["username"]
+            current_app.config["DATABASE"], session["username"], query
         )
-        return render_template("upload.html", files=user_files)
+        return render_template("upload.html", files=user_files, query=query)
 
     @app.route("/download/<int:file_id>")
     @login_required
