@@ -186,7 +186,7 @@ def register_auth_routes(app):
         if request.method == "POST":
             email = request.form.get("email", "").strip().lower()
 
-            # Use the same response for every request to avoid revealing emails.
+            # Use the same response whether or not the email is registered.
             if valid_email(email):
                 username = find_username_by_email(Config.DATABASE, email)
                 if username and reset_request_is_allowed(email):
@@ -235,7 +235,7 @@ def register_auth_routes(app):
                 flash("Invalid or expired password reset link.")
                 return redirect(url_for("forgot_password"))
 
-            # End the current session after changing account credentials.
+            # Require a new login after changing the password.
             session.clear()
             clear_failed_login_attempts(Config.DATABASE, username)
             flash("Password reset successfully. Please log in.")

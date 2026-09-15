@@ -107,7 +107,7 @@ def reset_password_with_token(database, token, password_hash):
     token_hash = hash_reset_token(token)
     connection = get_connection(database)
     try:
-        # Prevent two simultaneous requests from using the same token.
+        # Lock the transaction before consuming the token.
         connection.execute("BEGIN IMMEDIATE")
         record = connection.execute(
             """

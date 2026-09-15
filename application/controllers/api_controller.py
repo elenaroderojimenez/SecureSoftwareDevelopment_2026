@@ -134,7 +134,7 @@ def register_api_routes(app):
                 hash_password(password),
             )
         except sqlite3.IntegrityError:
-            # Keep the response safe if two registration requests race.
+            # Return the same response if two registrations race.
             return _error("account_unavailable", "Username or email is unavailable.", 409)
 
         return jsonify({"username": username, "message": "Account created."}), 201
@@ -182,7 +182,7 @@ def register_api_routes(app):
                 "expires_in": current_app.config["API_TOKEN_LIFETIME_MINUTES"] * 60,
             }
         )
-        # Prevent browsers and intermediary caches from retaining the credential.
+        # Do not cache a response containing a new credential.
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
         return response, 200
@@ -243,7 +243,7 @@ def register_api_routes(app):
             current_app.config["DATABASE"], file_id, g.api_username
         )
         if not record:
-            # Do not reveal whether another user's file_id exists.
+            # Do not disclose whether this file belongs to another user.
             return _error("file_not_found", "File not found.", 404)
 
         stored_name, original_name = record
