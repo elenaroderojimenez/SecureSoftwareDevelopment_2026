@@ -6,3 +6,5 @@ __pycache__/
 uploads/*
 !uploads/.gitkeep
 .env
+A3_REPORT_DRAFT.md
+TDD_DOCUMENTATION.tex
